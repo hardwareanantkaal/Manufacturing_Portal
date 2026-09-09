@@ -1,0 +1,162 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Auth ----------
+
+model Admin {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+
+  flashedDevices Device[] @relation("FlashedBy")
+  createdJobs    OtaJob[]
+}
+
+// ---------- Clients & Products ----------
+
+model Client {
+  id        String    @id @default(uuid())
+  name      String
+  email     String?
+  phone     String?
+  address   String?
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  products  Product[]
+
+  @@index([name])
+}
+
+model Product {
+  id           String     @id @default(uuid())
+  name         String
+  chipFamily   String                          // "esp32" | "esp32s3" | "esp32c3" | "esp8266"
+  isCellular   Boolean    @default(false)
+  modemModel   String?                         // "A7672S", "SIM7600"
+  description  String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  client       Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId     String
+
+  devices      Device[]
+  firmwares    Firmware[]
+
+  @@unique([clientId, name])
+  @@index([clientId])
+}
+
+// ---------- Devices ----------
+
+model Device {
+  id         String    @id @default(uuid())
+  serial     String                            // "000042" — unique per product, not globally
+  mac        String    @unique                 // "AABBCCDDEEFF"
+  claimToken String    @unique                 // 32-char hex, used in the site-2 claim URL
+  state      String    @default("flashed")     // flashed | shipped | active | offline | rma
+  fwVersion  String?
+  notes      String?
+
+  // cellular — null for WiFi products
+  imei       String?   @unique
+  iccid      String?
+  operator   String?
+  lastRssi   Int?
+
+  lastSeenAt DateTime?
+  lastIp     String?
+  flashedAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  product    Product   @relation(fields: [productId], references: [id])
+  productId  String
+
+  flashedBy  Admin?    @relation("FlashedBy", fields: [flashedById], references: [id])
+  flashedById String?
+
+  otaTargets OtaTarget[]
+
+  @@unique([productId, serial])
+  @@index([productId])
+  @@index([state])
+  @@index([lastSeenAt])
+}
+
+// ---------- Firmware ----------
+
+model Firmware {
+  id        String   @id @default(uuid())
+  version   String                             // "1.4.2"
+  binUrl    String
+  sha256    String
+  sizeBytes Int
+  channel   String   @default("stable")        // stable | beta
+  notes     String?
+  createdAt DateTime @default(now())
+
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+
+  otaJobs   OtaJob[]
+
+  @@unique([productId, version])
+  @@index([productId])
+}
+
+// ---------- OTA ----------
+
+model OtaJob {
+  id          String      @id @default(uuid())
+  status      String      @default("running")  // running | completed | cancelled
+  createdAt   DateTime    @default(now())
+  completedAt DateTime?
+
+  firmware    Firmware    @relation(fields: [firmwareId], references: [id])
+  firmwareId  String
+
+  createdBy   Admin?      @relation(fields: [createdById], references: [id])
+  createdById String?
+
+  targets     OtaTarget[]
+
+  @@index([firmwareId])
+  @@index([status])
+}
+
+model OtaTarget {
+  id          String    @id @default(uuid())
+  status      String    @default("pending")    // pending | downloading | success | failed
+  error       String?
+  retryCount  Int       @default(0)
+  startedAt   DateTime?
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  job         OtaJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobId       String
+
+  device      Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  deviceId    String
+
+  @@unique([jobId, deviceId])
+  @@index([deviceId])
+  @@index([status])
+}
+
+// ---------- Serial counter ----------
+
+model Counter {
+  name  String @id                             // "device_serial"
+  value Int    @default(0)
+}
