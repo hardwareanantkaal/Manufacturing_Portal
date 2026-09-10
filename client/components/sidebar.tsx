@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, CircuitBoard, RefreshCw, LogOut } from "lucide-react";
+import { LayoutDashboard, CircuitBoard, RefreshCw, LogOut, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/devices", label: "Devices", icon: CircuitBoard },
+  { href: "/data", label: "Data", icon: Activity },
   { href: "/updates", label: "Updates", icon: RefreshCw },
 ];
 
