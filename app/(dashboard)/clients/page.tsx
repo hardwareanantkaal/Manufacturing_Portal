@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { createClient, deleteClient } from "./actions";
-import { Building2 } from "lucide-react";
+import { Building2, Users } from "lucide-react";
 import Link from "next/link";
 
 export default async function ClientsPage() {
@@ -69,7 +69,6 @@ export default async function ClientsPage() {
               <th className="h-9 px-3 text-left font-semibold">Email</th>
               <th className="h-9 px-3 text-left font-semibold">Phone</th>
               <th className="h-9 px-3 text-left font-semibold">Products</th>
-              <th className="h-9 px-3 text-left font-semibold">Portal Users</th>
               <th className="h-9 px-3"></th>
             </tr>
           </thead>
@@ -99,19 +98,14 @@ export default async function ClientsPage() {
                     {c._count.products}
                   </span>
                 </td>
-                <td className="px-3 py-2.5">
+                <td className="px-3 py-2.5 text-right flex items-center justify-end gap-2">
                   <Link
                     href={`/clients/${c.id}/users`}
-                    className={`inline-block px-2 py-0.5 rounded-md font-mono text-xs font-semibold transition-colors ${
-                      c._count.users > 0
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-border text-foreground hover:bg-slate-100 transition-colors"
                   >
-                    {c._count.users}
+                    <Users size={13} className="text-muted-foreground" />
+                    <span>Users ({c._count.users})</span>
                   </Link>
-                </td>
-                <td className="px-3 py-2.5 text-right">
                   <form action={deleteClient.bind(null, c.id)}>
                     <button className="text-xs font-medium text-rose-600 hover:text-rose-700 transition-colors">
                       Delete

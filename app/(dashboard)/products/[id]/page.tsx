@@ -32,10 +32,11 @@ export default async function ProductDetailPage({
   const otaUrl = `${origin}/api/v1/ota/${product.productKey}`;
   const sensorSchema = (product.sensorSchema as SensorField[] | null) ?? [];
 
+  const sampleMac = product.devices[0]?.mac ?? "AABBCCDDEEFF";
   const curlExample = `curl -X POST ${dataUrl} \\
   -H "x-api-key: ${product.apiKey}" \\
   -H "Content-Type: application/json" \\
-  -d '{"mac":"AABBCCDDEEFF","payload":{${sensorSchema[0] ? `"${sensorSchema[0].key}":0` : '"temp":0'}}}'`;
+  -d '{"mac":"${sampleMac}","payload":{${sensorSchema[0] ? `"${sensorSchema[0].key}":0` : '"temp":0'}}}'`;
 
   const esp32Snippet = `#define SERVER      "${origin}"   // use your LAN IP for local testing, not localhost
 #define PRODUCT_KEY "${product.productKey}"

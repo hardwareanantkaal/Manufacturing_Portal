@@ -4,6 +4,7 @@ import Link from "next/link";
 import { CreateUserForm } from "./create-user-form";
 import { ResetPasswordForm } from "./reset-password-form";
 import { setUserActive } from "./actions";
+import { RoleSelector } from "./role-selector";
 import { ArrowLeft } from "lucide-react";
 
 export default async function ClientUsersPage({
@@ -58,9 +59,7 @@ export default async function ClientUsersPage({
                 <td className="px-3 py-2.5 font-medium text-foreground">{u.email}</td>
                 <td className="px-3 py-2.5 text-muted-foreground">{u.name ?? "—"}</td>
                 <td className="px-3 py-2.5">
-                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-xs font-semibold">
-                    {u.role}
-                  </span>
+                  <RoleSelector userId={u.id} clientId={client.id} currentRole={u.role} />
                 </td>
                 <td className="px-3 py-2.5">
                   <span

@@ -38,6 +38,11 @@ export async function setUserActive(userId: string, clientId: string, isActive: 
   revalidatePath(`/clients/${clientId}/users`);
 }
 
+export async function setUserRole(userId: string, clientId: string, role: string) {
+  await prisma.clientUser.update({ where: { id: userId }, data: { role } });
+  revalidatePath(`/clients/${clientId}/users`);
+}
+
 export async function resetUserPassword(_prevState: string | null, formData: FormData) {
   const userId = formData.get("userId") as string;
   const clientId = formData.get("clientId") as string;
