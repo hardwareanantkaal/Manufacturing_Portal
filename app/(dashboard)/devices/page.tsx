@@ -95,46 +95,6 @@ export default async function DevicesPage({
         )}
       </form>
 
-      <form
-        action={createDevice}
-        className="flex flex-wrap items-end gap-2 mb-6 p-3 rounded-lg border border-border bg-card"
-      >
-        <div className="flex flex-col gap-1">
-          <label className={LABEL_CLASS}>Product</label>
-          <select name="productId" required className={SELECT_CLASS}>
-            <option value="">Select product</option>
-            {products.map((p: (typeof products)[number]) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className={LABEL_CLASS}>MAC address</label>
-          <input
-            name="mac"
-            placeholder="AABBCCDDEEFF"
-            required
-            className={`${INPUT_CLASS} w-40 font-mono`}
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className={LABEL_CLASS}>IMEI</label>
-          <input name="imei" placeholder="Cellular only" className={`${INPUT_CLASS} w-36`} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className={LABEL_CLASS}>ICCID</label>
-          <input name="iccid" placeholder="Cellular only" className={`${INPUT_CLASS} w-40`} />
-        </div>
-        <button
-          type="submit"
-          className="h-8 px-3.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-blue-700 transition-colors"
-        >
-          Add Device
-        </button>
-      </form>
-
       <div className="rounded-lg border border-border bg-card overflow-hidden">
         <table className="w-full text-sm">
           <thead>

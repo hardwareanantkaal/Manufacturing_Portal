@@ -23,18 +23,38 @@ model Admin {
 // ---------- Clients & Products ----------
 
 model Client {
-  id        String    @id @default(uuid())
-  name      String
-  email     String?
-  phone     String?
-  address   String?
-  notes     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id           String    @id @default(uuid())
+  name         String
+  email        String?
+  phone        String?
+  address      String?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   products  Product[]
+  users     ClientUser[]
+  triggeredOtaJobs OtaJob[]
 
   @@index([name])
+}
+
+// One or more logins per client organization — staff create these,
+// there is no client self-registration.
+model ClientUser {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String?
+  role         String    @default("viewer")   // "admin" | "viewer"
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId String
+
+  @@index([clientId])
 }
 
 model Product {
@@ -46,6 +66,11 @@ model Product {
   description  String?
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
+
+  productKey   String     @unique              // URL-safe slug, e.g. "railway-coach-v2"
+  apiKey       String     @unique              // shared secret devices send as x-api-key
+  sensorSchema Json?                           // [{ key, label, unit, min, max }, ...]
+  readInterval Int        @default(300)        // seconds, informational — device-side setting
 
   client       Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
   clientId     String
@@ -63,7 +88,8 @@ model Device {
   id         String    @id @default(uuid())
   serial     String                            // "000042" — unique per product, not globally
   mac        String    @unique                 // "AABBCCDDEEFF"
-  claimToken String    @unique                 // 32-char hex, used in the site-2 claim URL
+  claimToken String?   @unique                 // 32-char hex; null once claimed (single-use)
+  claimedAt  DateTime?                          // set when a client user claims this device
   state      String    @default("flashed")     // flashed | shipped | active | offline | rma
   fwVersion  String?
   notes      String?
@@ -79,6 +105,12 @@ model Device {
   flashedAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
+  // deliberate duplicate of the newest Reading — the fleet list renders
+  // hundreds of devices, and without this it would need one subquery per
+  // device against a table with potentially millions of rows.
+  lastPayload   Json?
+  lastReadingAt DateTime?
+
   product    Product   @relation(fields: [productId], references: [id])
   productId  String
 
@@ -86,11 +118,26 @@ model Device {
   flashedById String?
 
   otaTargets OtaTarget[]
+  readings   Reading[]
 
   @@unique([productId, serial])
   @@index([productId])
   @@index([state])
   @@index([lastSeenAt])
+}
+
+// ---------- Sensor data ----------
+
+model Reading {
+  id         String   @id @default(uuid())
+  device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  deviceId   String
+  payload    Json                                // sensor values, shape varies per product
+  rssi       Int?                                // signal strength; null for WiFi devices
+  recordedAt DateTime @default(now())
+
+  // what keeps time-range queries fast — do not omit.
+  @@index([deviceId, recordedAt])
 }
 
 // ---------- Firmware ----------
@@ -128,10 +175,17 @@ model OtaJob {
   createdBy   Admin?      @relation(fields: [createdById], references: [id])
   createdById String?
 
+  // set when a client portal user triggers this job themselves, so staff
+  // can tell client-initiated rollouts from internal ones. Null for jobs
+  // created from the admin side.
+  triggeredByClient   Client? @relation(fields: [triggeredByClientId], references: [id])
+  triggeredByClientId String?
+
   targets     OtaTarget[]
 
   @@index([firmwareId])
   @@index([status])
+  @@index([triggeredByClientId])
 }
 
 model OtaTarget {

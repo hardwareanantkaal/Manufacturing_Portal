@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { deleteFirmware } from "./actions";
 import { UploadForm } from "./upload-form";
 import { CopyButton } from "@/components/copy-button";
-import { FileCode2 } from "lucide-react";
+import { FileCode2, Download } from "lucide-react";
 
 export default async function FirmwarePage() {
   const [products, deviceCounts] = await Promise.all([
@@ -89,7 +89,15 @@ export default async function FirmwarePage() {
                             {countFor(product.id, f.version)}
                           </span>
                         </td>
-                        <td className="px-3 py-2.5 text-right">
+                        <td className="px-3 py-2.5 text-right flex items-center justify-end gap-2">
+                          <a
+                            href={f.binUrl}
+                            download
+                            className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline px-2 py-1 rounded hover:bg-slate-100 transition-colors"
+                          >
+                            <Download size={13} />
+                            Download
+                          </a>
                           <form action={deleteFirmware.bind(null, f.id)}>
                             <button className="text-xs font-medium text-rose-600 hover:text-rose-700 transition-colors">
                               Delete

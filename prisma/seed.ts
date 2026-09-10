@@ -10,17 +10,33 @@ async function main() {
     create: { name: 'device_serial', value: 0 },
   });
 
-  await prisma.admin.upsert({
+  const passwordHash = await bcrypt.hash('Setupdev@123', 10);
+
+  // Remove legacy default admin if exists
+  await prisma.admin.deleteMany({
     where: { email: 'admin@anantkaal.com' },
-    update: {},
+  });
+
+  // Upsert target admin account
+  await prisma.admin.upsert({
+    where: { email: 'hardware.anantkaal@gmail.com' },
+    update: {
+      name: 'Anantkaal Admin',
+      passwordHash,
+    },
     create: {
-      email: 'admin@anantkaal.com',
-      name: 'Admin',
-      passwordHash: await bcrypt.hash('changeme123', 10),
+      email: 'hardware.anantkaal@gmail.com',
+      name: 'Anantkaal Admin',
+      passwordHash,
     },
   });
 
-  console.log('Seeded.');
+  console.log('Seeded admin account: hardware.anantkaal@gmail.com');
 }
 
-main().finally(() => prisma.$disconnect());
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(() => prisma.$disconnect());

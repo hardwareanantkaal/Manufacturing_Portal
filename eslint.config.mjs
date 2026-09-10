@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // client/ is its own separate Next.js project (own eslint config, own
+    // node_modules) nested inside this one — never lint it from here.
+    "client/**",
   ]),
 ]);
 

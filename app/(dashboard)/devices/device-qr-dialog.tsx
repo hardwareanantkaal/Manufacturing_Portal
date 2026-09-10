@@ -14,7 +14,7 @@ import {
 interface DeviceQrDialogProps {
   serial: string;
   mac: string;
-  claimToken: string;
+  claimToken: string | null;
 }
 
 export function DeviceQrDialog({ serial, mac, claimToken }: DeviceQrDialogProps) {
@@ -23,7 +23,7 @@ export function DeviceQrDialog({ serial, mac, claimToken }: DeviceQrDialogProps)
 
   useEffect(() => {
     if (open && claimToken) {
-      const claimUrl = `https://portal.anantkaal.com/claim/${mac}/${serial}/${claimToken}`;
+      const claimUrl = `${process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL}/claim/${mac}/${claimToken}`;
       QRCode.toDataURL(claimUrl, { margin: 1, width: 200 })
         .then((url) => setQrDataUrl(url))
         .catch(console.error);
@@ -49,10 +49,14 @@ export function DeviceQrDialog({ serial, mac, claimToken }: DeviceQrDialogProps)
         </DialogHeader>
         <div className="flex flex-col items-center gap-4 py-3">
           <div
-            id="print-device-sticker"
+            id="print-sticker"
             className="flex flex-col items-center gap-2.5 p-5 border border-border rounded-xl bg-white shadow-xs w-64"
           >
-            {qrDataUrl ? (
+            {!claimToken ? (
+              <div className="w-40 h-40 flex items-center justify-center text-center text-xs text-muted-foreground bg-slate-50 rounded-lg px-3">
+                Already claimed — this device&apos;s claim link has been used and is no longer valid.
+              </div>
+            ) : qrDataUrl ? (
               /* eslint-disable-next-line @next/next/no-img-element */
               <img
                 src={qrDataUrl}

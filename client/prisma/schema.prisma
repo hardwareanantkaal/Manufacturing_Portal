@@ -1,0 +1,222 @@
+// This schema mirrors ../prisma/schema.prisma (the admin portal's schema) —
+// both apps point at the same database. The admin portal owns schema
+// migrations; when its schema changes, copy the file here and re-run
+// `npx prisma generate` in this project. Do not run `prisma migrate` from
+// here — that would create a second, conflicting migration history against
+// a database the admin portal already migrates.
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- Auth ----------
+
+model Admin {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+
+  flashedDevices Device[] @relation("FlashedBy")
+  createdJobs    OtaJob[]
+}
+
+// ---------- Clients & Products ----------
+
+model Client {
+  id           String    @id @default(uuid())
+  name         String
+  email        String?
+  phone        String?
+  address      String?
+  notes        String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  products  Product[]
+  users     ClientUser[]
+  triggeredOtaJobs OtaJob[]
+
+  @@index([name])
+}
+
+// One or more logins per client organization — staff create these,
+// there is no client self-registration.
+model ClientUser {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  name         String?
+  role         String    @default("viewer")   // "admin" | "viewer"
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+
+  client   Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId String
+
+  @@index([clientId])
+}
+
+model Product {
+  id           String     @id @default(uuid())
+  name         String
+  chipFamily   String                          // "esp32" | "esp32s3" | "esp32c3" | "esp8266"
+  isCellular   Boolean    @default(false)
+  modemModel   String?                         // "A7672S", "SIM7600"
+  description  String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  productKey   String     @unique              // URL-safe slug, e.g. "railway-coach-v2"
+  apiKey       String     @unique              // shared secret devices send as x-api-key
+  sensorSchema Json?                           // [{ key, label, unit, min, max }, ...]
+  readInterval Int        @default(300)        // seconds, informational — device-side setting
+
+  client       Client     @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  clientId     String
+
+  devices      Device[]
+  firmwares    Firmware[]
+
+  @@unique([clientId, name])
+  @@index([clientId])
+}
+
+// ---------- Devices ----------
+
+model Device {
+  id         String    @id @default(uuid())
+  serial     String                            // "000042" — unique per product, not globally
+  mac        String    @unique                 // "AABBCCDDEEFF"
+  claimToken String?   @unique                 // 32-char hex; null once claimed (single-use)
+  claimedAt  DateTime?                          // set when a client user claims this device
+  state      String    @default("flashed")     // flashed | shipped | active | offline | rma
+  fwVersion  String?
+  notes      String?
+
+  // cellular — null for WiFi products
+  imei       String?   @unique
+  iccid      String?
+  operator   String?
+  lastRssi   Int?
+
+  lastSeenAt DateTime?
+  lastIp     String?
+  flashedAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // deliberate duplicate of the newest Reading — the fleet list renders
+  // hundreds of devices, and without this it would need one subquery per
+  // device against a table with potentially millions of rows.
+  lastPayload   Json?
+  lastReadingAt DateTime?
+
+  product    Product   @relation(fields: [productId], references: [id])
+  productId  String
+
+  flashedBy  Admin?    @relation("FlashedBy", fields: [flashedById], references: [id])
+  flashedById String?
+
+  otaTargets OtaTarget[]
+  readings   Reading[]
+
+  @@unique([productId, serial])
+  @@index([productId])
+  @@index([state])
+  @@index([lastSeenAt])
+}
+
+// ---------- Sensor data ----------
+
+model Reading {
+  id         String   @id @default(uuid())
+  device     Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  deviceId   String
+  payload    Json                                // sensor values, shape varies per product
+  rssi       Int?                                // signal strength; null for WiFi devices
+  recordedAt DateTime @default(now())
+
+  // what keeps time-range queries fast — do not omit.
+  @@index([deviceId, recordedAt])
+}
+
+// ---------- Firmware ----------
+
+model Firmware {
+  id        String   @id @default(uuid())
+  version   String                             // "1.4.2"
+  binUrl    String
+  sha256    String
+  sizeBytes Int
+  channel   String   @default("stable")        // stable | beta
+  notes     String?
+  createdAt DateTime @default(now())
+
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String
+
+  otaJobs   OtaJob[]
+
+  @@unique([productId, version])
+  @@index([productId])
+}
+
+// ---------- OTA ----------
+
+model OtaJob {
+  id          String      @id @default(uuid())
+  status      String      @default("running")  // running | completed | cancelled
+  createdAt   DateTime    @default(now())
+  completedAt DateTime?
+
+  firmware    Firmware    @relation(fields: [firmwareId], references: [id])
+  firmwareId  String
+
+  createdBy   Admin?      @relation(fields: [createdById], references: [id])
+  createdById String?
+
+  // set when a client portal user triggers this job themselves, so staff
+  // can tell client-initiated rollouts from internal ones. Null for jobs
+  // created from the admin side.
+  triggeredByClient   Client? @relation(fields: [triggeredByClientId], references: [id])
+  triggeredByClientId String?
+
+  targets     OtaTarget[]
+
+  @@index([firmwareId])
+  @@index([status])
+  @@index([triggeredByClientId])
+}
+
+model OtaTarget {
+  id          String    @id @default(uuid())
+  status      String    @default("pending")    // pending | downloading | success | failed
+  error       String?
+  retryCount  Int       @default(0)
+  startedAt   DateTime?
+  completedAt DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  job         OtaJob    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobId       String
+
+  device      Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  deviceId    String
+
+  @@unique([jobId, deviceId])
+  @@index([deviceId])
+  @@index([status])
+}
+
+// ---------- Serial counter ----------
+
+model Counter {
+  name  String @id                             // "device_serial"
+  value Int    @default(0)
+}

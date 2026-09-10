@@ -6,7 +6,7 @@ import Link from "next/link";
 export default async function ClientsPage() {
   const clients = await prisma.client.findMany({
     orderBy: { createdAt: "desc" },
-    include: { _count: { select: { products: true } } },
+    include: { _count: { select: { products: true, users: true } } },
   });
 
   return (
@@ -50,7 +50,7 @@ export default async function ClientsPage() {
           <input
             name="phone"
             placeholder="+91 98765 43210"
-            className="h-8 w-44 rounded-md border border-input bg-white px-2.5 text-sm outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
+            className="h-8 w-40 rounded-md border border-input bg-white px-2.5 text-sm outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30"
           />
         </div>
         <button
@@ -69,6 +69,7 @@ export default async function ClientsPage() {
               <th className="h-9 px-3 text-left font-semibold">Email</th>
               <th className="h-9 px-3 text-left font-semibold">Phone</th>
               <th className="h-9 px-3 text-left font-semibold">Products</th>
+              <th className="h-9 px-3 text-left font-semibold">Portal Users</th>
               <th className="h-9 px-3"></th>
             </tr>
           </thead>
@@ -97,6 +98,18 @@ export default async function ClientsPage() {
                   <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-xs font-semibold">
                     {c._count.products}
                   </span>
+                </td>
+                <td className="px-3 py-2.5">
+                  <Link
+                    href={`/clients/${c.id}/users`}
+                    className={`inline-block px-2 py-0.5 rounded-md font-mono text-xs font-semibold transition-colors ${
+                      c._count.users > 0
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {c._count.users}
+                  </Link>
                 </td>
                 <td className="px-3 py-2.5 text-right">
                   <form action={deleteClient.bind(null, c.id)}>

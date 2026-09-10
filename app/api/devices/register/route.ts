@@ -6,7 +6,7 @@ import { generateClaimToken } from "@/lib/claim-token";
 
 const MAC_REGEX = /^[0-9A-Fa-f]{12}$/;
 
-function deviceResponse(device: { serial: string; id: string; claimToken: string }) {
+function deviceResponse(device: { serial: string; id: string; claimToken: string | null }) {
   return NextResponse.json({
     serial: device.serial,
     deviceId: device.id,

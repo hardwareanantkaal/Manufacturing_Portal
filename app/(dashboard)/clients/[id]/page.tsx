@@ -28,6 +28,7 @@ export default async function ClientDetailPage({
         orderBy: { createdAt: "desc" },
         include: { _count: { select: { devices: true, firmwares: true } } },
       },
+      _count: { select: { users: true } },
     },
   });
 
@@ -43,11 +44,26 @@ export default async function ClientDetailPage({
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4 mb-8">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
           <Field label="Email" value={client.email ?? "—"} />
           <Field label="Phone" value={<span className="font-mono">{client.phone ?? "—"}</span>} />
           <Field label="Address" value={client.address ?? "—"} />
           <Field label="Products" value={client.products.length} />
+          <Field
+            label="Portal Users"
+            value={
+              <Link
+                href={`/clients/${client.id}/users`}
+                className={`text-xs font-semibold px-2 py-0.5 rounded-md transition-colors ${
+                  client._count.users > 0
+                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {client._count.users} {client._count.users === 1 ? "user" : "users"}
+              </Link>
+            }
+          />
         </div>
         {client.notes && (
           <div className="mt-4 pt-4 border-t border-border">
