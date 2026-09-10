@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 
-export function CopyButton({ value }: { value: string }) {
+export function CopyButton({ value, title = "Copy" }: { value: string; title?: string }) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -16,7 +16,7 @@ export function CopyButton({ value }: { value: string }) {
     <button
       type="button"
       onClick={handleCopy}
-      title="Copy full SHA-256"
+      title={title}
       className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-slate-100 transition-colors"
     >
       {copied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}

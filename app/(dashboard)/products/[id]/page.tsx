@@ -1,7 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { Wifi, Signal } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
+import { CopyButton } from "@/components/copy-button";
+import { ProductSettingsForm } from "./product-settings-form";
+import { RegenerateKeyButton } from "./regenerate-key-button";
+import type { SensorField } from "./sensor-schema-editor";
 
 export default async function ProductDetailPage({
   params,
@@ -20,6 +25,21 @@ export default async function ProductDetailPage({
   });
 
   if (!product) notFound();
+
+  const hdrs = await headers();
+  const origin = `${hdrs.get("x-forwarded-proto") ?? "http"}://${hdrs.get("host")}`;
+  const dataUrl = `${origin}/api/v1/data/${product.productKey}`;
+  const otaUrl = `${origin}/api/v1/ota/${product.productKey}`;
+  const sensorSchema = (product.sensorSchema as SensorField[] | null) ?? [];
+
+  const curlExample = `curl -X POST ${dataUrl} \\
+  -H "x-api-key: ${product.apiKey}" \\
+  -H "Content-Type: application/json" \\
+  -d '{"mac":"AABBCCDDEEFF","payload":{${sensorSchema[0] ? `"${sensorSchema[0].key}":0` : '"temp":0'}}}'`;
+
+  const esp32Snippet = `#define SERVER      "${origin}"   // use your LAN IP for local testing, not localhost
+#define PRODUCT_KEY "${product.productKey}"
+#define API_KEY     "${product.apiKey}"`;
 
   return (
     <div className="p-8">
@@ -43,6 +63,66 @@ export default async function ProductDetailPage({
           )}
         </div>
       </div>
+
+      <section className="mb-8">
+        <h2 className="text-sm font-semibold text-foreground mb-3">API configuration</h2>
+        <div className="mb-3 flex items-center gap-2 p-3 rounded-lg border border-border bg-card">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground shrink-0">
+            API key
+          </span>
+          <code className="flex-1 font-mono text-xs text-foreground truncate">{product.apiKey}</code>
+          <CopyButton value={product.apiKey} title="Copy API key" />
+          <RegenerateKeyButton productId={product.id} />
+        </div>
+        <ProductSettingsForm
+          productId={product.id}
+          productKey={product.productKey}
+          readInterval={product.readInterval}
+          sensorSchema={sensorSchema}
+        />
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-sm font-semibold text-foreground mb-3">Device integration</h2>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-card">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground shrink-0 w-24">
+              Data endpoint
+            </span>
+            <code className="flex-1 font-mono text-xs text-foreground truncate">{dataUrl}</code>
+            <CopyButton value={dataUrl} title="Copy data endpoint URL" />
+          </div>
+          <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-card">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground shrink-0 w-24">
+              OTA endpoint
+            </span>
+            <code className="flex-1 font-mono text-xs text-foreground truncate">{otaUrl}</code>
+            <CopyButton value={otaUrl} title="Copy OTA endpoint URL" />
+          </div>
+          <div className="p-3 rounded-lg border border-border bg-card">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                curl example
+              </span>
+              <CopyButton value={curlExample} title="Copy curl example" />
+            </div>
+            <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-all bg-slate-50 rounded-md p-2.5">
+{curlExample}
+            </pre>
+          </div>
+          <div className="p-3 rounded-lg border border-border bg-card">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                ESP32 config snippet
+              </span>
+              <CopyButton value={esp32Snippet} title="Copy ESP32 snippet" />
+            </div>
+            <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-all bg-slate-50 rounded-md p-2.5">
+{esp32Snippet}
+            </pre>
+          </div>
+        </div>
+      </section>
 
       <section className="mb-8">
         <h2 className="text-sm font-semibold text-foreground mb-3">Devices</h2>

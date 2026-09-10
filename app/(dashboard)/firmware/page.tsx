@@ -78,7 +78,7 @@ export default async function FirmwarePage() {
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
                             {f.sha256.slice(0, 12)}…
-                            <CopyButton value={f.sha256} />
+                            <CopyButton value={f.sha256} title="Copy full SHA-256" />
                           </div>
                         </td>
                         <td className="px-3 py-2.5 text-muted-foreground">
