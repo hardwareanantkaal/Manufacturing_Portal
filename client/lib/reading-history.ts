@@ -28,13 +28,46 @@ export function resolveRange(range: HistoryRange, customFrom?: string, customTo?
 
 export type HistoryBucket = { bucket: Date; avg: number | null; min: number | null; max: number | null };
 
-export async function queryFieldHistory(
+// scripts/rollup.ts (portal) only rolls up hours older than this many days,
+// and only deletes raw readings once rolled up — so day-granularity queries
+// (30d, or a long custom range) read anything older than this cutoff from
+// ReadingHourly and anything from the cutoff forward from raw Reading. The
+// split lands on a day boundary so the two sources never touch the same bucket.
+const ROLLUP_CUTOFF_DAYS = 7;
+
+function startOfUtcDay(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+}
+
+async function queryFieldHistoryFromHourly(
   deviceId: string,
   sensorKey: string,
-  resolved: ResolvedRange
+  since: Date,
+  until: Date
 ): Promise<HistoryBucket[]> {
-  const { since, until, granularity } = resolved;
+  return prisma.$queryRaw<HistoryBucket[]>`
+    SELECT
+      date_trunc('day', hour) AS bucket,
+      SUM((avg->>${sensorKey})::float * count) / NULLIF(SUM(count) FILTER (WHERE avg->>${sensorKey} IS NOT NULL), 0) AS avg,
+      MIN((min->>${sensorKey})::float) AS min,
+      MAX((max->>${sensorKey})::float) AS max
+    FROM "ReadingHourly"
+    WHERE "deviceId" = ${deviceId}
+      AND hour >= ${since}
+      AND hour < ${until}
+      AND avg->>${sensorKey} IS NOT NULL
+    GROUP BY bucket
+    ORDER BY bucket ASC
+  `;
+}
 
+async function queryFieldHistoryFromRaw(
+  deviceId: string,
+  sensorKey: string,
+  since: Date,
+  until: Date,
+  granularity: "hour" | "day"
+): Promise<HistoryBucket[]> {
   return prisma.$queryRaw<HistoryBucket[]>`
     SELECT
       date_trunc(${granularity}, "recordedAt") AS bucket,
@@ -49,4 +82,26 @@ export async function queryFieldHistory(
     GROUP BY bucket
     ORDER BY bucket ASC
   `;
+}
+
+export async function queryFieldHistory(
+  deviceId: string,
+  sensorKey: string,
+  resolved: ResolvedRange
+): Promise<HistoryBucket[]> {
+  const { since, until, granularity } = resolved;
+
+  if (granularity !== "day") {
+    return queryFieldHistoryFromRaw(deviceId, sensorKey, since, until, granularity);
+  }
+
+  const dayCutoff = startOfUtcDay(new Date(Date.now() - ROLLUP_CUTOFF_DAYS * DAY_MS));
+  const hourlyUntil = until < dayCutoff ? until : dayCutoff;
+  const rawSince = since > dayCutoff ? since : dayCutoff;
+
+  const [hourlyBuckets, rawBuckets] = await Promise.all([
+    since < hourlyUntil ? queryFieldHistoryFromHourly(deviceId, sensorKey, since, hourlyUntil) : [],
+    rawSince <= until ? queryFieldHistoryFromRaw(deviceId, sensorKey, rawSince, until, "day") : [],
+  ]);
+  return [...hourlyBuckets, ...rawBuckets];
 }

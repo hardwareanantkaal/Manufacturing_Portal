@@ -1,9 +1,3 @@
-// This schema mirrors ../prisma/schema.prisma (the admin portal's schema) —
-// both apps point at the same database. The admin portal owns schema
-// migrations; when its schema changes, copy the file here and re-run
-// `npx prisma generate` in this project. Do not run `prisma migrate` from
-// here — that would create a second, conflicting migration history against
-// a database the admin portal already migrates.
 generator client {
   provider = "prisma-client-js"
 }
@@ -125,6 +119,7 @@ model Device {
 
   otaTargets OtaTarget[]
   readings   Reading[]
+  readingHourlies ReadingHourly[]
 
   @@unique([productId, serial])
   @@index([productId])
@@ -144,6 +139,25 @@ model Reading {
 
   // what keeps time-range queries fast — do not omit.
   @@index([deviceId, recordedAt])
+}
+
+// One row per device per hour, holding every numeric sensor key seen in
+// that hour (not one column per key, since keys vary by product). Produced
+// by scripts/rollup.ts, never written directly. Raw Readings older than
+// the rollup cutoff are only deleted once a matching hourly row exists —
+// this table is the thing that makes that safe.
+model ReadingHourly {
+  id       String   @id @default(uuid())
+  device   Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  deviceId String
+  hour     DateTime                              // truncated to the hour (UTC)
+  avg      Json                                  // { [sensorKey]: number }
+  min      Json
+  max      Json
+  count    Int                                   // raw readings rolled into this bucket
+
+  @@unique([deviceId, hour])
+  @@index([deviceId, hour])
 }
 
 // ---------- Firmware ----------
