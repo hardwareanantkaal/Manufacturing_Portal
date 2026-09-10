@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { CopyButton } from "@/components/copy-button";
 import { ProductSettingsForm } from "./product-settings-form";
 import { RegenerateKeyButton } from "./regenerate-key-button";
-import type { SensorField } from "./sensor-schema-editor";
+import type { SensorField } from "@/lib/sensor-schema";
 
 export default async function ProductDetailPage({
   params,

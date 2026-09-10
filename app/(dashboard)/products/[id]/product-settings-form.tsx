@@ -2,7 +2,8 @@
 
 import { useActionState } from "react";
 import { updateProductSettings } from "./actions";
-import { SensorSchemaEditor, type SensorField } from "./sensor-schema-editor";
+import { SensorSchemaEditor } from "./sensor-schema-editor";
+import type { SensorField } from "@/lib/sensor-schema";
 
 const INPUT_CLASS =
   "h-8 rounded-md border border-input bg-white px-2.5 text-sm outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30";

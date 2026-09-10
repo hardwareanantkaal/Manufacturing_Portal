@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
-
-export type SensorField = { key: string; label: string; unit: string; min: number | null; max: number | null };
+import type { SensorField } from "@/lib/sensor-schema";
 
 const CELL_CLASS =
   "h-8 rounded-md border border-input bg-white px-2 text-xs outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30";

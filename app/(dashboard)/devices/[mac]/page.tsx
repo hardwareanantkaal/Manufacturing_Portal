@@ -5,6 +5,11 @@ import { StatusBadge } from "@/components/status-badge";
 import { EditSerialForm } from "../edit-serial-form";
 
 import { DeviceQrDialog } from "../device-qr-dialog";
+import { LiveDataCard } from "./live-data-card";
+import { RangeSelector } from "./range-selector";
+import { ReadingHistoryChart } from "./reading-history-chart";
+import { isHistoryRange, queryFieldHistory, type HistoryRange } from "@/lib/reading-history";
+import type { SensorField } from "@/lib/sensor-schema";
 
 const LABEL_CLASS = "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
 
@@ -19,10 +24,14 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 
 export default async function DeviceDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ mac: string }>;
+  searchParams: Promise<{ range?: string }>;
 }) {
   const { mac } = await params;
+  const { range: rangeParam } = await searchParams;
+  const range: HistoryRange = isHistoryRange(rangeParam) ? rangeParam : "24h";
 
   const device = await prisma.device.findUnique({
     where: { mac },
@@ -31,11 +40,21 @@ export default async function DeviceDetailPage({
 
   if (!device) notFound();
 
-  const otaHistory = await prisma.otaTarget.findMany({
-    where: { deviceId: device.id },
-    orderBy: { updatedAt: "desc" },
-    include: { job: { include: { firmware: true } } },
-  });
+  const sensorSchema = (device.product.sensorSchema as SensorField[] | null) ?? [];
+
+  const [otaHistory, rawReadings, ...fieldHistories] = await Promise.all([
+    prisma.otaTarget.findMany({
+      where: { deviceId: device.id },
+      orderBy: { updatedAt: "desc" },
+      include: { job: { include: { firmware: true } } },
+    }),
+    prisma.reading.findMany({
+      where: { deviceId: device.id },
+      orderBy: { recordedAt: "desc" },
+      take: 50,
+    }),
+    ...sensorSchema.map((field) => queryFieldHistory(device.id, field.key, range)),
+  ]);
 
   return (
     <div className="p-8">
@@ -82,6 +101,74 @@ export default async function DeviceDetailPage({
           </div>
         )}
       </div>
+
+      <div className="mb-8">
+        <LiveDataCard
+          lastPayload={device.lastPayload}
+          lastReadingAt={device.lastReadingAt}
+          sensorSchema={sensorSchema}
+          readIntervalSeconds={device.product.readInterval}
+        />
+      </div>
+
+      {sensorSchema.length > 0 && (
+        <section className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-foreground">History</h2>
+            <RangeSelector mac={device.mac} current={range} />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {sensorSchema.map((field, i) => (
+              <ReadingHistoryChart
+                key={field.key}
+                label={field.label || field.key}
+                unit={field.unit}
+                data={fieldHistories[i].map((row) => ({
+                  bucket: row.bucket.toISOString(),
+                  avg: row.avg,
+                  min: row.min,
+                  max: row.max,
+                }))}
+              />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="mb-8">
+        <h2 className="text-sm font-semibold text-foreground mb-3">Raw Readings</h2>
+        <div className="rounded-lg border border-border bg-card overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-slate-50 border-b border-border text-[11px] uppercase tracking-wide text-muted-foreground">
+                <th className="h-9 px-3 text-left font-semibold">Recorded</th>
+                <th className="h-9 px-3 text-left font-semibold">Payload</th>
+                {device.product.isCellular && <th className="h-9 px-3 text-left font-semibold">RSSI</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {rawReadings.map((r: (typeof rawReadings)[number]) => (
+                <tr key={r.id} className="border-t border-border hover:bg-slate-50/70 transition-colors">
+                  <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">
+                    {r.recordedAt.toLocaleString()}
+                  </td>
+                  <td className="px-3 py-2.5 font-mono text-xs text-foreground">
+                    {JSON.stringify(r.payload)}
+                  </td>
+                  {device.product.isCellular && (
+                    <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">
+                      {r.rssi != null ? `${r.rssi} dBm` : "—"}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {rawReadings.length === 0 && (
+            <p className="text-sm text-muted-foreground p-6 text-center">No readings recorded yet.</p>
+          )}
+        </div>
+      </section>
 
       <section>
         <h2 className="text-sm font-semibold text-foreground mb-3">OTA History</h2>
