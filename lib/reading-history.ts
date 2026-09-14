@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 
 export const HISTORY_RANGES = ["24h", "7d", "30d"] as const;
 export type HistoryRange = (typeof HISTORY_RANGES)[number];
@@ -12,10 +13,17 @@ export function rangeToSince(range: HistoryRange): Date {
   return new Date(Date.now() - ms);
 }
 
-// 24h/7d bucket by hour so the chart has enough points to be useful;
-// 30d buckets by day or an hourly chart would be thousands of points.
-export function rangeToGranularity(range: HistoryRange): "hour" | "day" {
-  return range === "30d" ? "day" : "hour";
+export type Granularity = "5min" | "hour" | "day";
+
+// 24h buckets at 5 minutes, not 1 hour — a device that's only been sending
+// data for the last 20 minutes (fresh flash, active testing) would otherwise
+// collapse into a single hourly bucket and render as one dot, which reads as
+// "the chart is broken" even though the aggregation is technically correct.
+// 7d buckets by hour, 30d by day, or those charts would be thousands of points.
+export function rangeToGranularity(range: HistoryRange): Granularity {
+  if (range === "30d") return "day";
+  if (range === "7d") return "hour";
+  return "5min";
 }
 
 export type HistoryBucket = { bucket: Date; avg: number | null; min: number | null; max: number | null };
@@ -60,11 +68,18 @@ async function queryFieldHistoryFromRaw(
   deviceId: string,
   sensorKey: string,
   since: Date,
-  granularity: "hour" | "day"
+  granularity: Granularity
 ): Promise<HistoryBucket[]> {
+  // date_trunc() has no "5 minutes" unit — truncate to the hour, then add a
+  // floored 5-minute offset within it to get 5-minute-aligned buckets.
+  const bucketExpr =
+    granularity === "5min"
+      ? Prisma.sql`date_trunc('hour', "recordedAt") + interval '5 min' * floor(extract(minute from "recordedAt") / 5)`
+      : Prisma.sql`date_trunc(${granularity}, "recordedAt")`;
+
   return prisma.$queryRaw<HistoryBucket[]>`
     SELECT
-      date_trunc(${granularity}, "recordedAt") AS bucket,
+      ${bucketExpr} AS bucket,
       AVG((payload->>${sensorKey})::float) AS avg,
       MIN((payload->>${sensorKey})::float) AS min,
       MAX((payload->>${sensorKey})::float) AS max

@@ -35,7 +35,9 @@ export function ReadingHistoryChart({
           <XAxis
             dataKey="bucket"
             tick={{ fontSize: 10 }}
-            tickFormatter={(v: string) => new Date(v).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit" })}
+            tickFormatter={(v: string) =>
+              new Date(v).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })
+            }
             minTickGap={30}
           />
           <YAxis tick={{ fontSize: 10 }} width={40} domain={["auto", "auto"]} />

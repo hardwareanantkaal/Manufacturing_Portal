@@ -7,7 +7,11 @@ import { LiveDataCard } from "./live-data-card";
 import { RangeSelector } from "./range-selector";
 import { ReadingHistoryChart } from "./reading-history-chart";
 import { isHistoryRange, resolveRange, queryFieldHistory, type HistoryRange } from "@/lib/reading-history";
+import { ReadingsTable } from "@/components/readings-table";
+import { ReadingsPagination } from "@/components/readings-pagination";
 import type { SensorField } from "@/lib/sensor-schema";
+
+const READINGS_PAGE_SIZE = 50;
 
 const LABEL_CLASS = "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
 
@@ -25,11 +29,12 @@ export default async function DeviceDetailPage({
   searchParams,
 }: {
   params: Promise<{ mac: string }>;
-  searchParams: Promise<{ range?: string; from?: string; to?: string }>;
+  searchParams: Promise<{ range?: string; from?: string; to?: string; page?: string }>;
 }) {
   const { clientId } = await requireClient();
   const { mac } = await params;
-  const { range: rangeParam, from, to } = await searchParams;
+  const { range: rangeParam, from, to, page: pageParam } = await searchParams;
+  const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
 
   const device = await getDeviceByMac(clientId, mac);
   if (!device) notFound();
@@ -38,14 +43,17 @@ export default async function DeviceDetailPage({
   const resolved = resolveRange(range, from, to);
   const sensorSchema = (device.product.sensorSchema as SensorField[] | null) ?? [];
 
-  const [rawReadings, ...fieldHistories] = await Promise.all([
+  const [rawReadings, readingCount, ...fieldHistories] = await Promise.all([
     prisma.reading.findMany({
       where: { deviceId: device.id },
       orderBy: { recordedAt: "desc" },
-      take: 50,
+      skip: (page - 1) * READINGS_PAGE_SIZE,
+      take: READINGS_PAGE_SIZE,
     }),
+    prisma.reading.count({ where: { deviceId: device.id } }),
     ...sensorSchema.map((field) => queryFieldHistory(device.id, field.key, resolved)),
   ]);
+  const totalPages = Math.max(1, Math.ceil(readingCount / READINGS_PAGE_SIZE));
 
   return (
     <div className="p-8">
@@ -130,35 +138,19 @@ export default async function DeviceDetailPage({
 
       <section className="mb-8">
         <h2 className="text-sm font-semibold text-foreground mb-3">Raw Readings</h2>
-        <div className="rounded-lg border border-border bg-card overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-slate-50 border-b border-border text-[11px] uppercase tracking-wide text-muted-foreground">
-                <th className="h-9 px-3 text-left font-semibold">Recorded</th>
-                <th className="h-9 px-3 text-left font-semibold">Payload</th>
-                {device.product.isCellular && <th className="h-9 px-3 text-left font-semibold">RSSI</th>}
-              </tr>
-            </thead>
-            <tbody>
-              {rawReadings.map((r) => (
-                <tr key={r.id} className="border-t border-border hover:bg-slate-50/70 transition-colors">
-                  <td className="px-3 py-2.5 text-muted-foreground whitespace-nowrap">
-                    {r.recordedAt.toLocaleString()}
-                  </td>
-                  <td className="px-3 py-2.5 font-mono text-xs text-foreground">{JSON.stringify(r.payload)}</td>
-                  {device.product.isCellular && (
-                    <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">
-                      {r.rssi != null ? `${r.rssi} dBm` : "—"}
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {rawReadings.length === 0 && (
-            <p className="text-sm text-muted-foreground p-6 text-center">No readings recorded yet.</p>
-          )}
-        </div>
+        <ReadingsTable
+          readings={rawReadings}
+          sensorSchema={sensorSchema}
+          isCellular={device.product.isCellular}
+          footer={
+            <ReadingsPagination
+              basePath={`/devices/${mac}`}
+              currentParams={{ range, from, to }}
+              page={page}
+              totalPages={totalPages}
+            />
+          }
+        />
       </section>
 
       <section>
