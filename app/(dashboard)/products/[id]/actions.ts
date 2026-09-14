@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { generateApiKey } from "@/lib/product-key";
 import { revalidatePath } from "next/cache";
 
-type SensorField = { key: string; label: string; unit: string; min: number | null; max: number | null };
+type SensorField = { key: string; label: string; unit: string };
 
 export async function updateProductSettings(_prevState: string | null, formData: FormData) {
   const productId = formData.get("productId") as string;

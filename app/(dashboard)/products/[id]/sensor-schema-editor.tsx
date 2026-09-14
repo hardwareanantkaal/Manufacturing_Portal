@@ -27,11 +27,11 @@ export function SensorSchemaEditor({
   }
 
   function addRow() {
-    setFields((prev) => [...prev, { key: "", label: "", unit: "", min: null, max: null }]);
+    setFields((prev) => [...prev, { key: "", label: "", unit: "" }]);
   }
 
   function addDetected(key: string) {
-    setFields((prev) => [...prev, { key, label: labelFromKey(key), unit: "", min: null, max: null }]);
+    setFields((prev) => [...prev, { key, label: labelFromKey(key), unit: "" }]);
   }
 
   function removeRow(i: number) {
@@ -87,20 +87,6 @@ export function SensorSchemaEditor({
               value={f.unit}
               onChange={(e) => update(i, { unit: e.target.value })}
               placeholder="unit (°C)"
-              className={`${CELL_CLASS} w-20`}
-            />
-            <input
-              type="number"
-              value={f.min ?? ""}
-              onChange={(e) => update(i, { min: e.target.value === "" ? null : Number(e.target.value) })}
-              placeholder="min"
-              className={`${CELL_CLASS} w-20`}
-            />
-            <input
-              type="number"
-              value={f.max ?? ""}
-              onChange={(e) => update(i, { max: e.target.value === "" ? null : Number(e.target.value) })}
-              placeholder="max"
               className={`${CELL_CLASS} w-20`}
             />
             <button
