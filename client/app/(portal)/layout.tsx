@@ -1,4 +1,5 @@
 import { Sidebar } from "@/components/sidebar";
+import { BottomNav } from "@/components/bottom-nav";
 import { requireClient } from "@/lib/tenant";
 import { logout } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
@@ -33,7 +34,8 @@ export default async function PortalLayout({
         userName={user.name ?? user.email}
         logoutAction={logoutAction}
       />
-      <main className="flex-1 bg-background">{children}</main>
+      <main className="flex-1 bg-background pb-16 md:pb-0">{children}</main>
+      <BottomNav />
     </div>
   );
 }

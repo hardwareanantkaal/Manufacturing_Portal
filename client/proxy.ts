@@ -14,5 +14,10 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!login|api|_next/static|_next/image|favicon.ico).*)"],
+  // manifest.webmanifest/sw.js/icons must stay public — the browser fetches
+  // these to decide installability and to run the service worker before
+  // (or without) a logged-in session existing at all.
+  matcher: [
+    "/((?!login|api|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|icons/).*)",
+  ],
 };

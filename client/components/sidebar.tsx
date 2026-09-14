@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { LayoutDashboard, CircuitBoard, RefreshCw, LogOut, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
+export const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/devices", label: "Devices", icon: CircuitBoard },
   { href: "/data", label: "Data", icon: Activity },
@@ -24,7 +24,7 @@ export function Sidebar({
   const pathname = usePathname();
 
   return (
-    <aside className="w-60 shrink-0 bg-sidebar text-sidebar-foreground flex flex-col">
+    <aside className="hidden md:flex w-60 shrink-0 bg-sidebar text-sidebar-foreground flex-col">
       <div className="h-14 flex flex-col justify-center px-4 border-b border-sidebar-border">
         <span className="font-semibold text-white tracking-wide text-sm">ANANTKAAL</span>
         <span className="text-[10px] uppercase tracking-widest text-slate-400 font-medium truncate">
