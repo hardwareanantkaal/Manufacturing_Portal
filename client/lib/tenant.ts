@@ -59,7 +59,7 @@ export async function getDevices(
 ) {
   return prisma.device.findMany({
     where: {
-      product: { clientId },
+      clientId,
       ...(filters?.productId ? { productId: filters.productId } : {}),
       ...(filters?.state ? { state: filters.state } : {}),
       ...(filters?.search
@@ -76,10 +76,11 @@ export async function getDevices(
   });
 }
 
-// Returns null if the device doesn't exist OR belongs to a different
-// client — the caller must treat both cases identically (call notFound())
-// rather than distinguishing them, so a client can't use the difference
-// to probe for the existence of another client's device.
+// Returns null if the device doesn't exist, isn't claimed by anyone yet, OR
+// belongs to a different client — the caller must treat all three cases
+// identically (call notFound()) rather than distinguishing them, so a
+// client can't use the difference to probe for another client's device or
+// for unclaimed stock.
 export async function getDeviceByMac(clientId: string, mac: string) {
   const device = await prisma.device.findUnique({
     where: { mac },
@@ -91,7 +92,7 @@ export async function getDeviceByMac(clientId: string, mac: string) {
       },
     },
   });
-  if (!device || device.product.clientId !== clientId) return null;
+  if (!device || device.clientId !== clientId) return null;
   return device;
 }
 
@@ -105,11 +106,11 @@ export async function getFirmware(clientId: string) {
 
 export async function getDashboardStats(clientId: string) {
   const [totalDevices, onlineDevices, productCount, devices] = await Promise.all([
-    prisma.device.count({ where: { product: { clientId } } }),
-    prisma.device.count({ where: { product: { clientId }, state: "active" } }),
+    prisma.device.count({ where: { clientId } }),
+    prisma.device.count({ where: { clientId, state: "active" } }),
     prisma.product.count({ where: { clientId } }),
     prisma.device.findMany({
-      where: { product: { clientId } },
+      where: { clientId },
       select: { fwVersion: true, productId: true },
     }),
   ]);
@@ -137,7 +138,7 @@ export async function getDashboardStats(clientId: string) {
 
 export async function getRecentOtaActivity(clientId: string, take = 10) {
   return prisma.otaTarget.findMany({
-    where: { device: { product: { clientId } } },
+    where: { device: { clientId } },
     orderBy: { updatedAt: "desc" },
     take,
     include: {
@@ -178,7 +179,7 @@ export async function claimDevice(clientId: string, mac: string, token: string):
       claimedAt: null,
       product: { clientId },
     },
-    data: { claimedAt: new Date(), claimToken: null, state: "active" },
+    data: { clientId, claimedAt: new Date(), claimToken: null, state: "active" },
   });
   return result.count === 1;
 }
@@ -211,7 +212,7 @@ export async function createClientOtaJob(
     where: {
       id: { in: params.deviceIds },
       productId: firmware.productId,
-      product: { clientId },
+      clientId,
     },
   });
   if (eligibleDeviceCount !== params.deviceIds.length) {
