@@ -1,11 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
-import { headers } from "next/headers";
-import { Wifi, Signal } from "lucide-react";
+import { Wifi, Signal, KeyRound } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { CopyButton } from "@/components/copy-button";
 import { ProductSettingsForm } from "./product-settings-form";
 import { RegenerateKeyButton } from "./regenerate-key-button";
+import { ApiKeyDisplay } from "./api-key-display";
 import type { DetectedField } from "./sensor-schema-editor";
 import type { SensorField } from "@/lib/sensor-schema";
 
@@ -27,8 +27,7 @@ export default async function ProductDetailPage({
 
   if (!product) notFound();
 
-  const hdrs = await headers();
-  const origin = `${hdrs.get("x-forwarded-proto") ?? "http"}://${hdrs.get("host")}`;
+  const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const dataUrl = `${origin}/api/v1/data/${product.productKey}`;
   const otaUrl = `${origin}/api/v1/ota/${product.productKey}`;
   const sensorSchema = (product.sensorSchema as SensorField[] | null) ?? [];
@@ -54,10 +53,9 @@ export default async function ProductDetailPage({
   }));
 
   const sampleMac = product.devices[0]?.mac ?? "AABBCCDDEEFF";
-  const curlExample = `curl -X POST ${dataUrl} \\
-  -H "x-api-key: ${product.apiKey}" \\
-  -H "Content-Type: application/json" \\
-  -d '{"mac":"${sampleMac}","payload":{${sensorSchema[0] ? `"${sensorSchema[0].key}":0` : '"temp":0'}}}'`;
+  // One line, no \ or ` continuations — those differ between PowerShell and
+  // Bash, so a single line is the only form that pastes correctly into both.
+  const curlExample = `curl.exe -X POST ${dataUrl} -H "x-api-key: ${product.apiKey}" -H "Content-Type: application/json" -d '{"mac":"${sampleMac}","payload":{${sensorSchema[0] ? `"${sensorSchema[0].key}":0` : '"temp":0'}}}'`;
 
   const esp32Snippet = `#define SERVER      "${origin}"   // use your LAN IP for local testing, not localhost
 #define PRODUCT_KEY "${product.productKey}"
@@ -87,27 +85,24 @@ export default async function ProductDetailPage({
       </div>
 
       <section className="mb-8">
-        <h2 className="text-sm font-semibold text-foreground mb-3">API configuration</h2>
-        <div className="mb-3 flex items-center gap-2 p-3 rounded-lg border border-border bg-card">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground shrink-0">
-            API key
-          </span>
-          <code className="flex-1 font-mono text-xs text-foreground truncate">{product.apiKey}</code>
-          <CopyButton value={product.apiKey} title="Copy API key" />
-          <RegenerateKeyButton productId={product.id} />
-        </div>
-        <ProductSettingsForm
-          productId={product.id}
-          productKey={product.productKey}
-          readInterval={product.readInterval}
-          sensorSchema={sensorSchema}
-          detectedFields={detectedFields}
-        />
-      </section>
+        <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-1.5">
+          <KeyRound size={14} className="text-primary" />
+          Device API
+        </h2>
+        <div className="flex flex-col gap-2 mb-4">
+          <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-card">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground shrink-0 w-24">
+              Product Key
+            </span>
+            <code className="flex-1 font-mono text-xs text-foreground truncate">{product.productKey}</code>
+            <CopyButton value={product.productKey} title="Copy product key" />
+          </div>
 
-      <section className="mb-8">
-        <h2 className="text-sm font-semibold text-foreground mb-3">Device integration</h2>
-        <div className="flex flex-col gap-3">
+          <ApiKeyDisplay apiKey={product.apiKey} />
+          <div className="flex justify-end -mt-1">
+            <RegenerateKeyButton productId={product.id} productName={product.name} />
+          </div>
+
           <div className="flex items-center gap-2 p-3 rounded-lg border border-border bg-card">
             <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground shrink-0 w-24">
               Data endpoint
@@ -122,10 +117,13 @@ export default async function ProductDetailPage({
             <code className="flex-1 font-mono text-xs text-foreground truncate">{otaUrl}</code>
             <CopyButton value={otaUrl} title="Copy OTA endpoint URL" />
           </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
           <div className="p-3 rounded-lg border border-border bg-card">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                curl example
+                curl example (paste into PowerShell to test)
               </span>
               <CopyButton value={curlExample} title="Copy curl example" />
             </div>
@@ -136,15 +134,26 @@ export default async function ProductDetailPage({
           <div className="p-3 rounded-lg border border-border bg-card">
             <div className="flex items-center justify-between mb-2">
               <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                ESP32 config snippet
+                ESP32 / ESP8266 config snippet
               </span>
-              <CopyButton value={esp32Snippet} title="Copy ESP32 snippet" />
+              <CopyButton value={esp32Snippet} title="Copy firmware snippet" />
             </div>
             <pre className="text-xs font-mono text-foreground whitespace-pre-wrap break-all bg-slate-50 rounded-md p-2.5">
 {esp32Snippet}
             </pre>
           </div>
         </div>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-sm font-semibold text-foreground mb-3">Product settings</h2>
+        <ProductSettingsForm
+          productId={product.id}
+          productKey={product.productKey}
+          readInterval={product.readInterval}
+          sensorSchema={sensorSchema}
+          detectedFields={detectedFields}
+        />
       </section>
 
       <section className="mb-8">

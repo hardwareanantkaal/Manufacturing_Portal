@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { createProduct, deleteProduct } from "./actions";
-import { Cpu, Wifi, Signal } from "lucide-react";
+import { Cpu, Wifi, Signal, KeyRound } from "lucide-react";
 import Link from "next/link";
 
 const SELECT_CLASS =
@@ -85,6 +85,7 @@ export default async function ProductsPage() {
               <th className="h-9 px-3 text-left font-semibold">Devices</th>
               <th className="h-9 px-3 text-left font-semibold">Firmwares</th>
               <th className="h-9 px-3"></th>
+              <th className="h-9 px-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -125,6 +126,15 @@ export default async function ProductsPage() {
                   <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-mono text-xs font-semibold">
                     {p._count.firmwares}
                   </span>
+                </td>
+                <td className="px-3 py-2.5 text-center">
+                  <Link
+                    href={`/products/${p.id}`}
+                    title="View API key & endpoints"
+                    className="inline-flex items-center justify-center w-7 h-7 rounded-md text-muted-foreground hover:text-primary hover:bg-slate-100 transition-colors"
+                  >
+                    <KeyRound size={14} />
+                  </Link>
                 </td>
                 <td className="px-3 py-2.5 text-right">
                   <form action={deleteProduct.bind(null, p.id)}>
