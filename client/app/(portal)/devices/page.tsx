@@ -1,6 +1,7 @@
 import { requireClient, getDevices, getProducts } from "@/lib/tenant";
 import { Wifi, Signal } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
+import { ScanDeviceDialog } from "@/components/scan-device-dialog";
 import Link from "next/link";
 
 const SELECT_CLASS =
@@ -24,11 +25,14 @@ export default async function DevicesPage({
 
   return (
     <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-foreground">Devices</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Every device registered under your account.
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Devices</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Every device registered under your account.
+          </p>
+        </div>
+        <ScanDeviceDialog />
       </div>
 
       <form method="GET" className="flex flex-wrap items-end gap-2 mb-6">
