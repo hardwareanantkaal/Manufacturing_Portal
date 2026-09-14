@@ -1,8 +1,20 @@
 import { requireClient, getDevices, getProducts } from "@/lib/tenant";
-import { Wifi, Signal } from "lucide-react";
+import { Wifi, Signal, Cpu } from "lucide-react";
 import { StatusBadge } from "@/components/status-badge";
 import { ScanDeviceDialog } from "@/components/scan-device-dialog";
 import Link from "next/link";
+
+type Device = Awaited<ReturnType<typeof getDevices>>[number];
+
+function groupByProduct(devices: Device[]) {
+  const groups = new Map<string, { product: Device["product"]; devices: Device[] }>();
+  for (const d of devices) {
+    const existing = groups.get(d.productId);
+    if (existing) existing.devices.push(d);
+    else groups.set(d.productId, { product: d.product, devices: [d] });
+  }
+  return [...groups.values()].sort((a, b) => a.product.name.localeCompare(b.product.name));
+}
 
 const SELECT_CLASS =
   "h-8 rounded-md border border-input bg-white px-2.5 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30";
@@ -22,6 +34,7 @@ export default async function DevicesPage({
     getDevices(clientId, { productId, state, search: q }),
     getProducts(clientId),
   ]);
+  const groups = groupByProduct(devices);
 
   return (
     <div className="p-8">
@@ -80,59 +93,73 @@ export default async function DevicesPage({
         )}
       </form>
 
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="bg-slate-50 border-b border-border text-[11px] uppercase tracking-wide text-muted-foreground">
-              <th className="h-9 px-3 text-left font-semibold">Serial</th>
-              <th className="h-9 px-3 text-left font-semibold">Product</th>
-              <th className="h-9 px-3 text-left font-semibold">Network</th>
-              <th className="h-9 px-3 text-left font-semibold">Firmware</th>
-              <th className="h-9 px-3 text-left font-semibold">State</th>
-              <th className="h-9 px-3 text-left font-semibold">Last Seen</th>
-            </tr>
-          </thead>
-          <tbody>
-            {devices.map((d) => (
-              <tr key={d.id} className="border-t border-border hover:bg-slate-50/70 transition-colors">
-                <td className="px-3 py-2.5">
-                  <Link
-                    href={`/devices/${d.mac}`}
-                    className="font-mono text-xs font-semibold text-foreground hover:text-primary transition-colors"
-                  >
-                    {d.serial}
-                  </Link>
-                </td>
-                <td className="px-3 py-2.5 text-foreground">{d.product.name}</td>
-                <td className="px-3 py-2.5">
-                  {d.product.isCellular ? (
-                    <span className="inline-flex items-center gap-1 font-mono text-xs text-foreground">
-                      <Signal size={13} className="text-slate-500" />
-                      {d.lastRssi != null ? `${d.lastRssi} dBm` : "—"}
-                    </span>
-                  ) : (
-                    <Wifi size={13} className="text-slate-500" />
-                  )}
-                </td>
-                <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">
-                  {d.fwVersion ?? "—"}
-                </td>
-                <td className="px-3 py-2.5">
-                  <StatusBadge status={d.state} />
-                </td>
-                <td className="px-3 py-2.5 text-muted-foreground">
-                  {d.lastSeenAt ? d.lastSeenAt.toLocaleString() : "never"}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {devices.length === 0 && (
-          <p className="text-sm text-muted-foreground p-6 text-center">
-            No devices match these filters.
-          </p>
-        )}
-      </div>
+      {devices.length === 0 ? (
+        <div className="rounded-lg border border-border bg-card p-6 text-center">
+          <p className="text-sm text-muted-foreground">No devices match these filters.</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-6">
+          {groups.map(({ product, devices: groupDevices }) => (
+            <section key={product.id}>
+              <h2 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                <span className="flex items-center justify-center w-7 h-7 rounded-md bg-secondary text-secondary-foreground shrink-0">
+                  <Cpu size={14} />
+                </span>
+                {product.name}
+                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-mono text-[11px] font-semibold">
+                  {groupDevices.length}
+                </span>
+              </h2>
+              <div className="rounded-lg border border-border bg-card overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-border text-[11px] uppercase tracking-wide text-muted-foreground">
+                      <th className="h-9 px-3 text-left font-semibold">Serial</th>
+                      <th className="h-9 px-3 text-left font-semibold">Network</th>
+                      <th className="h-9 px-3 text-left font-semibold">Firmware</th>
+                      <th className="h-9 px-3 text-left font-semibold">State</th>
+                      <th className="h-9 px-3 text-left font-semibold">Last Seen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {groupDevices.map((d) => (
+                      <tr key={d.id} className="border-t border-border hover:bg-slate-50/70 transition-colors">
+                        <td className="px-3 py-2.5">
+                          <Link
+                            href={`/devices/${d.mac}`}
+                            className="font-mono text-xs font-semibold text-foreground hover:text-primary transition-colors"
+                          >
+                            {d.serial}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          {d.product.isCellular ? (
+                            <span className="inline-flex items-center gap-1 font-mono text-xs text-foreground">
+                              <Signal size={13} className="text-slate-500" />
+                              {d.lastRssi != null ? `${d.lastRssi} dBm` : "—"}
+                            </span>
+                          ) : (
+                            <Wifi size={13} className="text-slate-500" />
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 font-mono text-xs text-muted-foreground">
+                          {d.fwVersion ?? "—"}
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <StatusBadge status={d.state} />
+                        </td>
+                        <td className="px-3 py-2.5 text-muted-foreground">
+                          {d.lastSeenAt ? d.lastSeenAt.toLocaleString() : "never"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
