@@ -1,13 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Sparkles } from "lucide-react";
 import type { SensorField } from "@/lib/sensor-schema";
 
 const CELL_CLASS =
   "h-8 rounded-md border border-input bg-white px-2 text-xs outline-none placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/30";
 
-export function SensorSchemaEditor({ initial }: { initial: SensorField[] }) {
+function labelFromKey(key: string): string {
+  return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+export type DetectedField = { key: string; sample: number };
+
+export function SensorSchemaEditor({
+  initial,
+  detected = [],
+}: {
+  initial: SensorField[];
+  detected?: DetectedField[];
+}) {
   const [fields, setFields] = useState<SensorField[]>(initial.length > 0 ? initial : []);
 
   function update(i: number, patch: Partial<SensorField>) {
@@ -18,13 +30,44 @@ export function SensorSchemaEditor({ initial }: { initial: SensorField[] }) {
     setFields((prev) => [...prev, { key: "", label: "", unit: "", min: null, max: null }]);
   }
 
+  function addDetected(key: string) {
+    setFields((prev) => [...prev, { key, label: labelFromKey(key), unit: "", min: null, max: null }]);
+  }
+
   function removeRow(i: number) {
     setFields((prev) => prev.filter((_, idx) => idx !== i));
   }
 
+  const configuredKeys = new Set(fields.map((f) => f.key.toLowerCase()));
+  const unconfiguredDetected = detected.filter((d) => !configuredKeys.has(d.key.toLowerCase()));
+
   return (
     <div>
       <input type="hidden" name="sensorSchema" value={JSON.stringify(fields)} />
+
+      {unconfiguredDetected.length > 0 && (
+        <div className="mb-3 p-2.5 rounded-md bg-blue-50 border border-blue-100">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-blue-700 mb-1.5 flex items-center gap-1">
+            <Sparkles size={11} />
+            Seen in incoming data, not yet configured
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {unconfiguredDetected.map((d) => (
+              <button
+                key={d.key}
+                type="button"
+                onClick={() => addDetected(d.key)}
+                className="inline-flex items-center gap-1 h-6 px-2 rounded-full border border-blue-200 bg-white text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors"
+              >
+                <Plus size={11} />
+                {d.key}
+                <span className="text-blue-400 font-mono">({d.sample})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
         {fields.map((f, i) => (
           <div key={i} className="flex items-center gap-2">

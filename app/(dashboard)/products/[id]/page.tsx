@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { CopyButton } from "@/components/copy-button";
 import { ProductSettingsForm } from "./product-settings-form";
 import { RegenerateKeyButton } from "./regenerate-key-button";
+import type { DetectedField } from "./sensor-schema-editor";
 import type { SensorField } from "@/lib/sensor-schema";
 
 export default async function ProductDetailPage({
@@ -31,6 +32,26 @@ export default async function ProductDetailPage({
   const dataUrl = `${origin}/api/v1/data/${product.productKey}`;
   const otaUrl = `${origin}/api/v1/ota/${product.productKey}`;
   const sensorSchema = (product.sensorSchema as SensorField[] | null) ?? [];
+
+  // What admins actually pick from in the "select which data is received"
+  // field picker — real numeric keys seen in devices' latest payloads, so
+  // schema entries come from what's really arriving instead of hand-typed
+  // (and possibly mistyped) key names.
+  const configuredKeys = new Set(sensorSchema.map((f) => f.key.toLowerCase()));
+  const detectedFieldsMap = new Map<string, number>();
+  for (const device of product.devices) {
+    const payload = device.lastPayload as Record<string, unknown> | null;
+    if (!payload) continue;
+    for (const [key, value] of Object.entries(payload)) {
+      if (typeof value === "number" && !configuredKeys.has(key.toLowerCase())) {
+        detectedFieldsMap.set(key, value);
+      }
+    }
+  }
+  const detectedFields: DetectedField[] = [...detectedFieldsMap.entries()].map(([key, sample]) => ({
+    key,
+    sample,
+  }));
 
   const sampleMac = product.devices[0]?.mac ?? "AABBCCDDEEFF";
   const curlExample = `curl -X POST ${dataUrl} \\
@@ -80,6 +101,7 @@ export default async function ProductDetailPage({
           productKey={product.productKey}
           readInterval={product.readInterval}
           sensorSchema={sensorSchema}
+          detectedFields={detectedFields}
         />
       </section>
 

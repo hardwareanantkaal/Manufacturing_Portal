@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 import { updateProductSettings } from "./actions";
-import { SensorSchemaEditor } from "./sensor-schema-editor";
+import { SensorSchemaEditor, type DetectedField } from "./sensor-schema-editor";
 import type { SensorField } from "@/lib/sensor-schema";
 
 const INPUT_CLASS =
@@ -14,11 +14,13 @@ export function ProductSettingsForm({
   productKey,
   readInterval,
   sensorSchema,
+  detectedFields,
 }: {
   productId: string;
   productKey: string;
   readInterval: number;
   sensorSchema: SensorField[];
+  detectedFields: DetectedField[];
 }) {
   const [error, formAction, pending] = useActionState(updateProductSettings, null);
 
@@ -52,7 +54,7 @@ export function ProductSettingsForm({
 
       <div>
         <label className={`${LABEL_CLASS} block mb-2`}>Sensor schema</label>
-        <SensorSchemaEditor initial={sensorSchema} />
+        <SensorSchemaEditor initial={sensorSchema} detected={detectedFields} />
       </div>
 
       {error && <p className="text-xs font-medium text-rose-600">{error}</p>}
