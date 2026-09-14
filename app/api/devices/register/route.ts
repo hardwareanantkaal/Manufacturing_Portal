@@ -71,12 +71,26 @@ export async function POST(request: Request) {
   const existing = await prisma.device.findUnique({ where: { mac: normalizedMac } });
 
   if (existing) {
+    // A MAC is globally unique — re-registering it under a DIFFERENT
+    // product is never a legitimate re-flash, it's a mistake (wrong
+    // product selected, or a chip's MAC colliding with another device's
+    // record) and must be rejected rather than silently moving the device.
+    // Re-registering under the SAME product (re-flashing the same board)
+    // is the normal, expected case and still just updates fields.
+    if (existing.productId !== productId) {
+      return NextResponse.json(
+        {
+          error: `MAC ${normalizedMac} is already registered under a different product (serial '${existing.serial}'). A device's MAC can't be reassigned to another product.`,
+        },
+        { status: 409 }
+      );
+    }
+
     const finalSerial = requestedSerial?.trim() || existing.serial;
     const updated = await prisma.device.update({
       where: { mac: normalizedMac },
       data: {
         serial: finalSerial,
-        productId,
         ...(imei !== undefined ? { imei: imei || null } : {}),
         ...(iccid !== undefined ? { iccid: iccid || null } : {}),
         ...(firmwareVersion !== undefined ? { fwVersion: firmwareVersion || null } : {}),
