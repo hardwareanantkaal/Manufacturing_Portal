@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { StatusBadge } from "@/components/status-badge";
+import { CancelJobButton } from "../cancel-job-button";
 
 const LABEL_CLASS = "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
 
@@ -36,11 +37,14 @@ export default async function OtaJobDetailPage({
 
   return (
     <div className="p-8">
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-foreground font-mono">{job.firmware.version}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {job.firmware.product.name} &middot; {job.firmware.product.client.name}
-        </p>
+      <div className="mb-6 flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground font-mono">{job.firmware.version}</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {job.firmware.product.name} &middot; {job.firmware.product.client.name}
+          </p>
+        </div>
+        {job.status === "running" && <CancelJobButton jobId={job.id} />}
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4 mb-8">

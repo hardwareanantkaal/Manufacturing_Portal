@@ -40,3 +40,31 @@ export async function createOtaJob({
   revalidatePath("/ota");
   return { error: null };
 }
+
+// Delivery is pull-based (a device only learns about a pending target when
+// it next polls), so there's no way to reach out and stop a device that's
+// already mid-download — it'll finish and report success/failure regardless.
+// What cancel CAN do: stop any target still "pending" (not yet handed to a
+// device) from ever being served — checkPendingOta() only looks at
+// status: "pending", so flipping those to "cancelled" here is what actually
+// takes effect, not just marking the job itself.
+export async function cancelOtaJob(jobId: string) {
+  const job = await prisma.otaJob.findUnique({ where: { id: jobId }, select: { status: true } });
+  if (!job) return { error: "Job not found." };
+  if (job.status !== "running") return { error: "Only a running job can be cancelled." };
+
+  await prisma.$transaction([
+    prisma.otaTarget.updateMany({
+      where: { jobId, status: "pending" },
+      data: { status: "cancelled", completedAt: new Date() },
+    }),
+    prisma.otaJob.update({
+      where: { id: jobId },
+      data: { status: "cancelled", completedAt: new Date() },
+    }),
+  ]);
+
+  revalidatePath("/ota");
+  revalidatePath(`/ota/${jobId}`);
+  return { error: null };
+}
