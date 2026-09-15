@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-
-const MAX_RETRIES = 3;
+import { MAX_OTA_RETRIES, finalizeJobIfComplete } from "@/lib/ota-check";
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);
@@ -39,10 +38,10 @@ export async function POST(request: Request) {
     });
   } else {
     const retryCount = target.retryCount + 1;
-    // Under 3 attempts: requeue as "pending" so the next poll serves it
-    // again. At 3, fail permanently — a device endlessly retrying a
-    // download on a metered SIM is an expensive bug in itself.
-    const permanentlyFailed = retryCount >= MAX_RETRIES;
+    // Under the cap: requeue as "pending" so the next poll serves it again.
+    // At the cap, fail permanently — a device endlessly retrying a download
+    // on a metered SIM is an expensive bug in itself.
+    const permanentlyFailed = retryCount >= MAX_OTA_RETRIES;
     await prisma.otaTarget.update({
       where: { id: target.id },
       data: {
@@ -54,15 +53,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const remaining = await prisma.otaTarget.count({
-    where: { jobId: target.jobId, status: { in: ["pending", "downloading"] } },
-  });
-  if (remaining === 0) {
-    await prisma.otaJob.update({
-      where: { id: target.jobId },
-      data: { status: "completed", completedAt: new Date() },
-    });
-  }
+  await finalizeJobIfComplete(target.jobId);
 
   return NextResponse.json({ ok: true });
 }

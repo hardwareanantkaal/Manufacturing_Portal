@@ -144,6 +144,7 @@ static void runOta(JsonObjectConst ota) {
   uint8_t buf[512];
   long totalWritten = 0;
   unsigned long lastData = millis();
+  unsigned long lastProgressLog = millis();
 
   while (totalWritten < contentLength) {
     size_t avail = stream->available();
@@ -171,6 +172,21 @@ static void runOta(JsonObjectConst ota) {
       restartAfterFailedOta();
     }
     totalWritten += got;
+
+    // Flash writes on ESP8266 are the real bottleneck here, not the network
+    // — a tight loop through readBytes()/Update.write() with nothing else
+    // in between can run long enough without yielding to trip the hardware
+    // watchdog, which silently resets the chip mid-download. It never gets
+    // a chance to call reportOta(), so the target is left stuck at
+    // "downloading" server-side (lib/ota-check.ts recovers that after a
+    // few minutes, but feeding the watchdog here is the actual fix).
+    yield();
+
+    if (millis() - lastProgressLog > 2000) {
+      lastProgressLog = millis();
+      Serial.printf("OTA progress: %ld / %ld bytes (%.0f%%)\n",
+                    totalWritten, contentLength, 100.0 * totalWritten / contentLength);
+    }
   }
   http.end();
 
