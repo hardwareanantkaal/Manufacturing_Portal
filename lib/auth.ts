@@ -31,7 +31,7 @@ export async function createSession(admin: { id: string; email: string; name: st
   };
 
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, encodeSession(payload), {
+  cookieStore.set(SESSION_COOKIE, await encodeSession(payload), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

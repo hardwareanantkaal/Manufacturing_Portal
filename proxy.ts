@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifySessionCookie, SESSION_COOKIE } from "@/lib/session";
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const raw = request.cookies.get(SESSION_COOKIE)?.value;
-  const session = raw ? verifySessionCookie(raw) : null;
+  const session = raw ? await verifySessionCookie(raw) : null;
 
   if (!session) {
     return NextResponse.redirect(new URL("/login", request.url));
