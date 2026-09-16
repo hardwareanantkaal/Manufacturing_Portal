@@ -91,8 +91,7 @@ export default async function FirmwarePage() {
                         </td>
                         <td className="px-3 py-2.5 text-right flex items-center justify-end gap-2">
                           <a
-                            href={f.binUrl}
-                            download
+                            href={`/firmware/${f.id}/download`}
                             className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline px-2 py-1 rounded hover:bg-slate-100 transition-colors"
                           >
                             <Download size={13} />

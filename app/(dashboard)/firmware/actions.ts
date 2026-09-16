@@ -3,8 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import crypto from "crypto";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
+import { put, del } from "@vercel/blob";
 
 // version becomes part of a filesystem path, so restrict it to safe characters
 // (no "/", "..", etc.) — otherwise a crafted version string could write outside
@@ -35,15 +34,22 @@ export async function uploadFirmware(_prevState: string | null, formData: FormDa
   const buffer = Buffer.from(await file.arrayBuffer());
   const sha256 = crypto.createHash("sha256").update(buffer).digest("hex");
 
-  const dir = path.join(process.cwd(), "public", "firmware", productId);
-  await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, `${version}.bin`), buffer);
+  // "private" — devices/admins only ever reach this file through our own
+  // apiKey-gated download route (app/api/v1/firmware/[firmwareId]), never
+  // by knowing the Blob URL directly. No random suffix: the path is already
+  // unique (enforced by the productId_version DB constraint above), and a
+  // deterministic path makes the stored binUrl legible.
+  const blob = await put(`firmware/${productId}/${version}.bin`, buffer, {
+    access: "private",
+    addRandomSuffix: false,
+    contentType: "application/octet-stream",
+  });
 
   await prisma.firmware.create({
     data: {
       productId,
       version,
-      binUrl: `/firmware/${productId}/${version}.bin`,
+      binUrl: blob.url,
       sha256,
       sizeBytes: buffer.byteLength,
       notes,
@@ -55,6 +61,12 @@ export async function uploadFirmware(_prevState: string | null, formData: FormDa
 }
 
 export async function deleteFirmware(id: string) {
+  const firmware = await prisma.firmware.findUnique({ where: { id } });
+  if (firmware) {
+    // Best-effort — if the blob's already gone for some reason, don't let
+    // that block removing the DB row.
+    await del(firmware.binUrl).catch(() => {});
+  }
   await prisma.firmware.delete({ where: { id } });
   revalidatePath("/firmware");
 }

@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { stat, open } from "fs/promises";
-import { Readable } from "stream";
-import path from "path";
+import { get } from "@vercel/blob";
 
 export async function GET(
   request: Request,
@@ -23,58 +21,41 @@ export async function GET(
     return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
   }
 
-  const filePath = path.join(process.cwd(), "public", firmware.binUrl);
-  const stats = await stat(filePath).catch(() => null);
-  if (!stats) {
-    return NextResponse.json({ error: "Firmware file missing on disk" }, { status: 404 });
-  }
-
   const range = request.headers.get("range");
-  const commonHeaders = {
-    "Content-Type": "application/octet-stream",
-    "Accept-Ranges": "bytes",
-  };
 
-  if (!range) {
-    const handle = await open(filePath, "r");
-    const nodeStream = handle.createReadStream();
-    nodeStream.on("close", () => handle.close().catch(() => {}));
-    return new Response(Readable.toWeb(nodeStream) as ReadableStream, {
-      status: 200,
-      headers: { ...commonHeaders, "Content-Length": String(stats.size) },
+  let result;
+  try {
+    result = await get(firmware.binUrl, {
+      access: "private",
+      // Forwarded straight through to Blob storage, which handles the
+      // actual byte-range math — we don't parse/validate it ourselves.
+      ...(range ? { headers: { Range: range } } : {}),
     });
+  } catch {
+    // The SDK's result type only models 200/304 — an invalid/out-of-bounds
+    // Range (416) or any other unexpected upstream status surfaces as a
+    // thrown error instead of a result we can inspect.
+    return new Response(null, { status: 416 });
   }
 
-  // "bytes=<start>-<end>" — end is optional (means "to EOF")
-  const match = /^bytes=(\d*)-(\d*)$/.exec(range);
-  if (!match) {
-    return new Response(null, {
-      status: 416,
-      headers: { "Content-Range": `bytes */${stats.size}` },
-    });
+  if (!result || result.statusCode !== 200) {
+    return NextResponse.json({ error: "Firmware file missing" }, { status: 404 });
   }
 
-  const start = match[1] ? parseInt(match[1], 10) : 0;
-  const end = match[2] ? parseInt(match[2], 10) : stats.size - 1;
+  // Derive our own response status from the raw upstream headers rather
+  // than trusting a single fixed status — a Range request still comes
+  // back as result.statusCode 200 in this SDK's type, but the underlying
+  // fetch response is a real 206 with a Content-Range header when Blob
+  // storage actually honored the range.
+  const contentRange = result.headers.get("content-range");
 
-  if (Number.isNaN(start) || Number.isNaN(end) || start > end || end >= stats.size) {
-    return new Response(null, {
-      status: 416,
-      headers: { "Content-Range": `bytes */${stats.size}` },
-    });
-  }
-
-  const chunkSize = end - start + 1;
-  const handle = await open(filePath, "r");
-  const nodeStream = handle.createReadStream({ start, end });
-  nodeStream.on("close", () => handle.close().catch(() => {}));
-
-  return new Response(Readable.toWeb(nodeStream) as ReadableStream, {
-    status: 206,
+  return new Response(result.stream, {
+    status: contentRange ? 206 : 200,
     headers: {
-      ...commonHeaders,
-      "Content-Length": String(chunkSize),
-      "Content-Range": `bytes ${start}-${end}/${stats.size}`,
+      "Content-Type": "application/octet-stream",
+      "Accept-Ranges": "bytes",
+      "Content-Length": result.headers.get("content-length") ?? String(result.blob.size),
+      ...(contentRange ? { "Content-Range": contentRange } : {}),
     },
   });
 }

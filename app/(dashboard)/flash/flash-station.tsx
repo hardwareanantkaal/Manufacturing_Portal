@@ -388,8 +388,11 @@ export function FlashStation({
 
       setFlashState("flashing");
       appendLog(`Downloading firmware ${selectedFirmware.version}...`);
-      const binRes = await fetch(selectedFirmware.binUrl);
-      if (!binRes.ok) throw new Error(`Could not download firmware from ${selectedFirmware.binUrl}`);
+      // Not selectedFirmware.binUrl directly — that's a private Blob URL now,
+      // not fetchable from the browser. Goes through the same admin-session-
+      // gated download route the Firmware page's "Download" link uses.
+      const binRes = await fetch(`/firmware/${selectedFirmware.id}/download`);
+      if (!binRes.ok) throw new Error(`Could not download firmware ${selectedFirmware.version}`);
       const firmwareData = new Uint8Array(await binRes.arrayBuffer());
 
       appendLog(`Flashing ${(firmwareData.byteLength / 1024).toFixed(0)} KB...`);
