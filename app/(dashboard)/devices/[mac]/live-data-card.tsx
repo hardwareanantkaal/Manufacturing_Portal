@@ -1,5 +1,5 @@
 import { Activity } from "lucide-react";
-import type { SensorField } from "@/lib/sensor-schema";
+import { type SensorField, getSensorValue } from "@/lib/sensor-schema";
 import { getStaleness, formatRelativeTime, STALENESS_CLASSES } from "@/lib/staleness";
 
 export function LiveDataCard({
@@ -37,7 +37,7 @@ export function LiveDataCard({
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
           {sensorSchema.map((field) => {
-            const raw = payload[field.key];
+            const raw = getSensorValue(payload, field);
             const value = typeof raw === "number" ? raw : raw != null ? String(raw) : "—";
             return (
               <div key={field.key} className="flex flex-col gap-1">

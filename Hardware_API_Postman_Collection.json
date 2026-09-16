@@ -1,0 +1,90 @@
+{
+	"info": {
+		"_postman_id": "weather-report-test-v1",
+		"name": "Anantkaal Hardware API",
+		"description": "Pre-configured collection for testing IoT Data Ingest & OTA APIs",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Send Telemetry Data (POST)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "x-api-key",
+						"value": "6f937af25b1a7fe160e20951e6d1d434",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"mac\": \"94E686502284\",\n  \"fw\": \"1.0.0\",\n  \"rssi\": -53,\n  \"payload\": {\n    \"temp\": 26.7,\n    \"humidity\": 60\n  }\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:3001/api/v1/data/weather-report",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3001",
+					"path": [
+						"api",
+						"v1",
+						"data",
+						"weather-report"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "2. Check OTA Update (GET)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "x-api-key",
+						"value": "6f937af25b1a7fe160e20951e6d1d434",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:3001/api/v1/ota/weather-report?mac=94E686502284&version=1.0.0",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "3001",
+					"path": [
+						"api",
+						"v1",
+						"ota",
+						"weather-report"
+					],
+					"query": [
+						{
+							"key": "mac",
+							"value": "94E686502284"
+						},
+						{
+							"key": "version",
+							"value": "1.0.0"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
