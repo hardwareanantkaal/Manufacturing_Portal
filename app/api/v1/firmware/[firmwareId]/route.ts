@@ -59,12 +59,21 @@ export async function GET(
   // there's no Content-Range and this correctly reports 200 instead.
   const contentRange = result.headers.get("content-range");
 
-  return new Response(result.stream, {
+  // Buffered, not streamed: piping result.stream straight into the Response
+  // made Vercel serve it with chunked transfer-encoding and no
+  // Content-Length at all — the ESP8266's esp_http_client needs the total
+  // size up front to call Update.begin(), so a chunked response is a dead
+  // end for it, not just a missing header. Firmware images are well under
+  // 1MB, comfortably inside the serverless memory limit, so buffering the
+  // whole thing is the simpler and correct trade here.
+  const buffer = await new Response(result.stream).arrayBuffer();
+
+  return new Response(buffer, {
     status: contentRange ? 206 : 200,
     headers: {
       "Content-Type": "application/octet-stream",
       "Accept-Ranges": "bytes",
-      "Content-Length": result.headers.get("content-length") ?? String(result.blob.size),
+      "Content-Length": String(buffer.byteLength),
       ...(contentRange ? { "Content-Range": contentRange } : {}),
     },
   });
