@@ -128,7 +128,7 @@ export async function POST(
   ]);
 
   const origin = new URL(request.url).origin;
-  const ota = await checkPendingOta(device.id, origin);
+  const ota = await checkPendingOta(device.id, origin, fw);
 
   if (ota) {
     return NextResponse.json({ ota });

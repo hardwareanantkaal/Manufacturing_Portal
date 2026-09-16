@@ -59,8 +59,11 @@ async function recoverStaleDownload(deviceId: string) {
 // Shared by the data-ingest endpoint's piggybacked OTA check and the
 // standalone /api/v1/ota/[productKey] poll — both must serve (and
 // transition) a pending target the exact same way, or a device that uses
-// one path and not the other would behave differently.
-export async function checkPendingOta(deviceId: string, origin: string) {
+// one path and not the other would behave differently. reportedFw is
+// whatever firmware version the device says it's currently running on
+// this same request (the "fw" field on a data POST, or the "version"
+// query param on the standalone poll).
+export async function checkPendingOta(deviceId: string, origin: string, reportedFw?: string | null) {
   await recoverStaleDownload(deviceId);
 
   const target = await prisma.otaTarget.findFirst({
@@ -70,6 +73,21 @@ export async function checkPendingOta(deviceId: string, origin: string) {
   });
 
   if (!target) return null;
+
+  // The device is already running the version this target is trying to
+  // deliver — it flashed successfully at some point, but the success
+  // report never landed (e.g. a crash or dropped connection right after
+  // reboot, before that one request went out). Reconcile from the version
+  // it's actually reporting instead of leaving it stuck being offered an
+  // update it already has, forever.
+  if (reportedFw && reportedFw === target.job.firmware.version) {
+    await prisma.otaTarget.update({
+      where: { id: target.id },
+      data: { status: "success", completedAt: new Date() },
+    });
+    await finalizeJobIfComplete(target.jobId);
+    return null;
+  }
 
   await prisma.otaTarget.update({
     where: { id: target.id },

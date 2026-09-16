@@ -38,7 +38,7 @@ export async function GET(
     },
   });
 
-  const ota = await checkPendingOta(device.id, url.origin);
+  const ota = await checkPendingOta(device.id, url.origin, version);
   if (!ota) {
     return new Response(null, { status: 204 });
   }
